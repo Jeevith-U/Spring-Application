@@ -23,7 +23,7 @@ import com.jsp.eventmanagement.dao.EventDao;
 import com.jsp.eventmanagement.model.Event;
 import com.jsp.eventmanagement.service.EventService;
 
-public class EventServiceTest {
+public class EventServiceSaveTest {
 
     @Mock
     private EventDao eventDao;

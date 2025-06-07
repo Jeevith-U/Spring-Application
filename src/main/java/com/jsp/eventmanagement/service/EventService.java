@@ -44,7 +44,7 @@ public class EventService {
 			response.setMessage("Event Found in the databse sucessfully");
 			response.setData(foundEvent);
 
-			return new ResponseEntity<ResponseStructure<Event>>(response, HttpStatus.CREATED);
+			return new ResponseEntity<ResponseStructure<Event>>(response, HttpStatus.FOUND);
 		} else
 			throw new EventNotFoundException("Unable to find Event for the ID : " + id);
 	}
