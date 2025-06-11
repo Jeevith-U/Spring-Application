@@ -1,6 +1,7 @@
 package com.jsp.eventmanagement.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -28,7 +29,14 @@ public class EventController {
 	@GetMapping("event/{id}")
 	public ResponseEntity<ResponseStructure<Event>> findEventById(@PathVariable int id) {
 		
-		return service.findEventById(id) ;
+		Event foundEvent = service.findEventById(id) ;
+		
+		ResponseStructure<Event> response = new ResponseStructure<Event>();
+		response.setStatusCode(HttpStatus.FOUND.value());
+		response.setMessage("Event Found in the databse sucessfully");
+		response.setData(foundEvent);
+		
+		return new ResponseEntity<ResponseStructure<Event>>(response, HttpStatus.FOUND) ;
 	}
 	
 	@PutMapping("event")

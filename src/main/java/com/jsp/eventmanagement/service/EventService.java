@@ -1,6 +1,11 @@
 package com.jsp.eventmanagement.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -14,78 +19,105 @@ import com.jsp.eventmanagement.model.Event;
 @Service
 public class EventService {
 
-	@Autowired
-	private EventDao dao;
+    @Autowired
+    private EventDao dao;
 
-	public ResponseEntity<ResponseStructure<Event>> saveEvent(Event event) {
+    private static final Logger logger = LoggerFactory.getLogger(EventService.class);
 
-		if (event.getId() != 0 && event.getName() != null && event.getDiscription() != null) {
+    public ResponseEntity<ResponseStructure<Event>> saveEvent(Event event) {
 
-			Event savedEvent = dao.saveEvent(event);
+        logger.info("Attempting to save event: {}", event);
 
-			ResponseStructure<Event> response = new ResponseStructure<Event>();
-			response.setStatusCode(HttpStatus.CREATED.value());
-			response.setMessage("Event saved to the databse sucessfully");
-			response.setData(savedEvent);
+        if (event.getId() != 0 && event.getName() != null && event.getDiscription() != null) {
 
-			return new ResponseEntity<ResponseStructure<Event>>(response, HttpStatus.CREATED);
-		} else
-			throw new UnableToSaveEventException("Missing attributes...");
-	}
+            Event savedEvent = dao.saveEvent(event);
 
-	public ResponseEntity<ResponseStructure<Event>> findEventById(int id) {
+            logger.debug("Event saved successfully: {}", savedEvent);
 
-		Event foundEvent = dao.findEventById(id);
+            ResponseStructure<Event> response = new ResponseStructure<>();
+            response.setStatusCode(HttpStatus.CREATED.value());
+            response.setMessage("Event saved to the database successfully");
+            response.setData(savedEvent);
 
-		if (foundEvent != null) {
+            return new ResponseEntity<>(response, HttpStatus.CREATED);
 
-			ResponseStructure<Event> response = new ResponseStructure<Event>();
-			response.setStatusCode(HttpStatus.FOUND.value());
-			response.setMessage("Event Found in the databse sucessfully");
-			response.setData(foundEvent);
+        } else {
+            logger.error("Unable to save event - Missing required fields: {}", event);
+            throw new UnableToSaveEventException("Missing attributes...");
+        }
+    }
 
-			return new ResponseEntity<ResponseStructure<Event>>(response, HttpStatus.FOUND);
-		} else
-			throw new EventNotFoundException("Unable to find Event for the ID : " + id);
-	}
+    @Cacheable(value = "events", key = "#id")
+    public Event findEventById(int id) {
 
-	public ResponseEntity<ResponseStructure<Event>> updateEvent(Event event) {
+        logger.info("Attempting to retrieve event with ID: {}", id);
 
-		Event oldEvent = dao.findEventById(event.getId());
+        Event foundEvent = dao.findEventById(id);
 
-		if (oldEvent != null && event.getName() != null) {
+        if (foundEvent != null) {
+            logger.debug("Event retrieved successfully from DB (and now cached): {}", foundEvent);
+            return foundEvent;
+        } else {
+            logger.warn("Event with ID {} not found in DB", id);
+            throw new EventNotFoundException("Unable to find Event for ID: " + id);
+        }
+    }
 
-			Event updateEvent = dao.saveEvent(event);
+    @CachePut(value = "events", key = "#event.id")
+    public ResponseEntity<ResponseStructure<Event>> updateEvent(Event event) {
 
-			ResponseStructure<Event> response = new ResponseStructure<Event>();
-			response.setStatusCode(HttpStatus.OK.value());
-			response.setMessage("Event Updated in the Database sucessfully");
-			response.setData(updateEvent);
-			return new ResponseEntity<ResponseStructure<Event>>(response, HttpStatus.OK);
-		} else
-			throw new EventNotFoundException("Missing the Attribute : " + event.getId() + " or : " + event.getName());
-	}
+        logger.info("Attempting to update event with ID: {}", event.getId());
 
-	public ResponseEntity<ResponseStructure<Boolean>> DeleteEventById(int id) {
+        Event oldEvent = dao.findEventById(event.getId());
 
-		Event foundEvent = dao.findEventById(id);
+        if (oldEvent != null && event.getName() != null) {
 
-		if (foundEvent != null) {
-			
-			boolean flag = dao.deleteEvent(id) ;
-			
-			if(flag) {
+            Event updatedEvent = dao.saveEvent(event);
 
-				ResponseStructure<Boolean> response = new ResponseStructure<Boolean>();
-				response.setStatusCode(HttpStatus.OK.value());
-				response.setMessage("Event deleted from the databse sucessfully");
-				response.setData(true);
-				return new ResponseEntity<ResponseStructure<Boolean>>(response, HttpStatus.OK);
-				
-			}
-			else
-				throw new EventNotFoundException("Unable to Delere Event for the ID : " + id);
-		} else
-			throw new EventNotFoundException("Unable to Delete Event for the ID : " + id);
-	}
+            logger.debug("Event updated successfully: {}", updatedEvent);
+
+            ResponseStructure<Event> response = new ResponseStructure<>();
+            response.setStatusCode(HttpStatus.OK.value());
+            response.setMessage("Event updated in the database successfully");
+            response.setData(updatedEvent);
+
+            return new ResponseEntity<>(response, HttpStatus.OK);
+
+        } else {
+            logger.warn("Update failed - Event not found or invalid input: {}", event);
+            throw new EventNotFoundException("Missing the Attribute : " + event.getId() + " or : " + event.getName());
+        }
+    }
+
+    @CacheEvict(value = "events", key = "#id")
+    public ResponseEntity<ResponseStructure<Boolean>> DeleteEventById(int id) {
+
+        logger.info("Attempting to delete event with ID: {}", id);
+
+        Event foundEvent = dao.findEventById(id);
+
+        if (foundEvent != null) {
+
+            boolean isDeleted = dao.deleteEvent(id);
+
+            if (isDeleted) {
+                logger.debug("Event with ID {} deleted from DB and cache evicted", id);
+
+                ResponseStructure<Boolean> response = new ResponseStructure<>();
+                response.setStatusCode(HttpStatus.OK.value());
+                response.setMessage("Event deleted from the database successfully");
+                response.setData(true);
+
+                return new ResponseEntity<>(response, HttpStatus.OK);
+
+            } else {
+                logger.error("Failed to delete event with ID {} from DB", id);
+                throw new EventNotFoundException("Unable to delete Event for the ID: " + id);
+            }
+
+        } else {
+            logger.warn("Delete failed - Event not found for ID: {}", id);
+            throw new EventNotFoundException("Unable to delete Event for the ID: " + id);
+        }
+    }
 }
