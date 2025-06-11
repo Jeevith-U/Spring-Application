@@ -77,10 +77,10 @@ public class EventService {
 			if(flag) {
 
 				ResponseStructure<Boolean> response = new ResponseStructure<Boolean>();
-				response.setStatusCode(HttpStatus.FOUND.value());
-				response.setMessage("Event Found in the databse sucessfully");
+				response.setStatusCode(HttpStatus.OK.value());
+				response.setMessage("Event deleted from the databse sucessfully");
 				response.setData(true);
-				return new ResponseEntity<ResponseStructure<Boolean>>(response, HttpStatus.CREATED);
+				return new ResponseEntity<ResponseStructure<Boolean>>(response, HttpStatus.OK);
 				
 			}
 			else
